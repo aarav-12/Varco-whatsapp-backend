@@ -42,7 +42,9 @@ app.post('/tally/varicose', async (req, res) => {
     const field = fields.find(f => f.label === label);
     return field ? field.value : null;
   };
-
+app.get('/', (req, res) => {
+  res.send('Varco backend is running!');
+});
   const { error } = await supabase
     .from('varicose_checkin')
     .insert({

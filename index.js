@@ -58,11 +58,4 @@ app.post('/tally/varicose', async (req, res) => {
 });
 
 app.listen(3000, () => console.log('Varco backend running on port 3000'));
-```
 
----
-
-### File 3 — `README.md`
-```
-# Varco WhatsApp Backend
-Webhook receiver for Tally forms → Supabase

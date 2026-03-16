@@ -9,6 +9,10 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+app.get('/', (req, res) => {
+  res.send('Varco backend is running!');
+});
+
 // Neuropathy form webhook
 app.post('/tally/neuropathy', async (req, res) => {
   const fields = req.body.data.fields;
@@ -16,7 +20,6 @@ app.post('/tally/neuropathy', async (req, res) => {
     const field = fields.find(f => f.label === label);
     return field ? field.value : null;
   };
-
   const { error } = await supabase
     .from('neuropathy_checkin')
     .insert({
@@ -30,7 +33,6 @@ app.post('/tally/neuropathy', async (req, res) => {
       glucose: getValue('What was your glucose reading today?'),
       sleep_quality: getValue('How well did you sleep last night?')
     });
-
   if (error) return res.status(500).json({ error });
   res.status(200).json({ success: true });
 });
@@ -42,9 +44,6 @@ app.post('/tally/varicose', async (req, res) => {
     const field = fields.find(f => f.label === label);
     return field ? field.value : null;
   };
-app.get('/', (req, res) => {
-  res.send('Varco backend is running!');
-});
   const { error } = await supabase
     .from('varicose_checkin')
     .insert({
@@ -54,10 +53,8 @@ app.get('/', (req, res) => {
       walking_distance: getValue('How far can you walk comfortably today?'),
       sleep_quality: getValue('How well did you sleep last night? Did leg discomfort wake you?')
     });
-
   if (error) return res.status(500).json({ error });
   res.status(200).json({ success: true });
 });
 
 app.listen(3000, () => console.log('Varco backend running on port 3000'));
-

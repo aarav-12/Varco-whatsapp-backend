@@ -15,21 +15,31 @@ app.get('/', (req, res) => {
 
 // ─── HELPER ───────────────────────────────────────────────
 const findOrCreatePatient = async (phone, condition) => {
-  const { data: existing } = await supabase
-    .from('patients')
-    .select('id')
-    .eq('phone', phone)
-    .single();
+  try {
+    const { data: existing, error: findError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle();
 
-  if (existing) return existing.id;
+    if (existing) return existing.id;
 
-  const { data: newPatient } = await supabase
-    .from('patients')
-    .insert({ phone, condition })
-    .select('id')
-    .single();
+    const { data: newPatient, error: insertError } = await supabase
+      .from('patients')
+      .insert({ phone, condition })
+      .select('id')
+      .single();
 
-  return newPatient?.id;
+    if (insertError) {
+      console.error('Patient insert error:', insertError);
+      return null;
+    }
+
+    return newPatient?.id;
+  } catch (err) {
+    console.error('findOrCreatePatient failed:', err);
+    return null;
+  }
 };
 
 // ─── NEUROPATHY FORM ───────────────────────────────────────

@@ -1,13 +1,31 @@
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-undef */
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-
+require('dotenv').config();
+// const { calculateVPNSS } = require('./utils/vpnss');
+const { processCheckin } = require('./services/checkinService');  
 const app = express();
 app.use(express.json());
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseKey);
+
+if (!hasSupabaseConfig) {
+  console.warn('SUPABASE_URL or SUPABASE_KEY is missing. Supabase routes will return configuration errors until these are set.');
+}
+
+const supabase = hasSupabaseConfig ? createClient(supabaseUrl, supabaseKey) : null;
+
+const ensureSupabaseConfigured = (res) => {
+  if (supabase) return true;
+
+  res.status(500).json({
+    error: 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_KEY in your environment.'
+  });
+  return false;
+};
 
 app.get('/', (req, res) => {
   res.send('Varco backend is running!');
@@ -49,6 +67,8 @@ const parseFields = (fields) => {
 
 // ─── PATIENT HELPER ────────────────────────────────────────
 const findOrCreatePatient = async (phone, condition) => {
+  if (!supabase) return null;
+
   try {
     const { data: existing } = await supabase
       .from('patients')
@@ -76,8 +96,12 @@ const findOrCreatePatient = async (phone, condition) => {
   }
 };
 
+
+
 // ─── NEUROPATHY FORM ───────────────────────────────────────
 app.post('/tally/neuropathy', async (req, res) => {
+  if (!ensureSupabaseConfigured(res)) return;
+
   try {
     const fields = req.body.data.fields;
     const getValue = parseFields(fields);
@@ -132,7 +156,7 @@ app.post('/tally/neuropathy', async (req, res) => {
     const patientId = await findOrCreatePatient(phone, 'neuropathy');
 
     // ── STORE RAW CHECKIN ──
-    const { data: checkin, error: checkinError } = await supabase
+    const { error: checkinError } = await supabase
       .from('daily_checkins')
       .insert({
         patient_id: patientId,
@@ -159,7 +183,7 @@ app.post('/tally/neuropathy', async (req, res) => {
     res.status(200).json({ success: true });
 
     // ── BACKGROUND PROCESSING ──
-    setImmediate(() => processCheckin(patientId, answers));
+    setImmediate(() => processCheckin(supabase, patientId, answers));
 
   } catch (err) {
     console.error('Neuropathy route error:', err);
@@ -169,6 +193,8 @@ app.post('/tally/neuropathy', async (req, res) => {
 
 // ─── VARICOSE VEIN FORM ────────────────────────────────────
 app.post('/tally/varicose', async (req, res) => {
+  if (!ensureSupabaseConfigured(res)) return;
+
   try {
     const fields = req.body.data.fields;
     console.log('VARICOSE FIELDS:', JSON.stringify(fields, null, 2));
@@ -228,4 +254,33 @@ app.post('/tally/varicose', async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log('Varco backend running on port 3000'));
+app.get('/test', async (req, res) => {
+  const fakeAnswers = {
+    burning: 6,
+    tingling: 5,
+    numbness: 7,
+    walking: 1,
+    glucose: 180,
+    sleep: 4,
+    diafoot: false,
+    neurapan: false,
+    lumical_left: false,
+    lumical_right: false,
+    movement: false,
+    wound: false
+  };
+
+ const { data: patient } = await supabase
+  .from('patients')
+  .select('id')
+  .limit(1)
+  .single();
+
+const patientId = patient.id;
+
+  await processCheckin(supabase, patientId, fakeAnswers);
+
+  res.send('Test done');
+});
+const PORT = Number(process.env.PORT) || 3001;
+app.listen(PORT, () => console.log(`Varco backend running on port ${PORT}`));

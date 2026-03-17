@@ -3,10 +3,26 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "dev": "nodemon index.js",
     "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "@supabase/supabase-js": "^2.38.0"
-  }
+    "@supabase/supabase-js": "^2.38.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "description": "this is the working of the scoring system and the service layer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarav-12/Varco-whatsapp-backend.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aarav-12/Varco-whatsapp-backend/issues"
+  },
+  "homepage": "https://github.com/aarav-12/Varco-whatsapp-backend#readme"
 }

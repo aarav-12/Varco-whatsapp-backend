@@ -4,25 +4,56 @@ const { calculateVPNSS } = require('../utils/vpnss');
 const { generateMessage } = require('./aiService');
 const { sendWhatsAppMessage } = require('./whatsappService');
 
-const processCheckin = async (supabase, patientId, answers) => {
+const processCheckin = async (supabase, phone, answers) => {
   try {
-    console.log('[PROCESS START]', patientId);
+    console.log('[PROCESS START]', phone);
 
     const today = new Date().toISOString().split('T')[0];
+
+    // ── FIND OR CREATE PATIENT ──
+    let patient;
+
+    const { data: existingPatient } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('phone', phone)
+      .single();
+
+    if (existingPatient) {
+      patient = existingPatient;
+      console.log('[PATIENT FOUND]', patient.id);
+    } else {
+      const { data: newPatient, error: createError } = await supabase
+        .from('patients')
+        .insert({
+          phone: phone,
+          name: 'Unknown'
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('[PATIENT CREATE ERROR]', createError);
+        return;
+      }
+
+      patient = newPatient;
+      console.log('[PATIENT CREATED]', patient.id);
+    }
 
     // ── GET LAST 7 DAYS ──
     const { data: last7 } = await supabase
       .from('daily_checkins')
       .select('numbness, walking')
-      .eq('patient_id', patientId)
+      .eq('patient_id', patient.id)
       .order('created_at', { ascending: false })
       .limit(7);
 
-    // ── GET LAST 14 DAYS FOR MISSED DAYS ──
+    // ── GET LAST 14 DAYS ──
     const { data: recent } = await supabase
       .from('daily_checkins')
       .select('date')
-      .eq('patient_id', patientId)
+      .eq('patient_id', patient.id)
       .gte(
         'date',
         new Date(Date.now() - 14 * 86400000)
@@ -32,25 +63,25 @@ const processCheckin = async (supabase, patientId, answers) => {
 
     const missedDays = Math.max(0, 14 - (recent?.length || 0));
 
-    // ── CALCULATE VPNSS ──
+    // ── VPNSS ──
     const score = calculateVPNSS(answers, last7 || [], missedDays);
 
     console.log('[VPNSS]', score);
 
-    // ── GET TODAY'S CHECKIN ID ──
+    // ── GET TODAY CHECKIN ──
     const { data: checkin } = await supabase
       .from('daily_checkins')
       .select('id')
-      .eq('patient_id', patientId)
+      .eq('patient_id', patient.id)
       .eq('date', today)
       .single();
 
-    // ── SAVE VPNSS SCORE ──
+    // ── SAVE VPNSS ──
     const { error: vpnssError } = await supabase
       .from('vpnss_scores')
       .upsert(
         {
-          patient_id: patientId,
+          patient_id: patient.id,
           checkin_id: checkin?.id,
           date: today,
           base_score: score.breakdown?.base || 0,
@@ -70,33 +101,21 @@ const processCheckin = async (supabase, patientId, answers) => {
     if (vpnssError) {
       console.error('[VPNSS SAVE ERROR]', vpnssError);
       return;
-    } else {
-      console.log('[VPNSS SAVED]');
     }
 
-    // ── GET PATIENT PHONE ──
-    const { data: patient, error: patientError } = await supabase
-      .from('patients')
-      .select('phone')
-      .eq('id', patientId)
-      .single();
+    console.log('[VPNSS SAVED]');
 
-    if (patientError || !patient?.phone) {
-      console.error('[PATIENT FETCH ERROR]', patientError);
-      return;
-    }
-
-    // ── GENERATE AI MESSAGE ──
+    // ── AI MESSAGE ──
     const aiResponse = await generateMessage(score, answers);
 
-    // ── SEND WHATSAPP ──
+    // ── WHATSAPP ──
     await sendWhatsAppMessage(patient.phone, aiResponse.text);
 
     // ── STORE MESSAGE ──
     const { error: msgError } = await supabase
       .from('coaching_messages')
       .insert({
-        patient_id: patientId,
+        patient_id: patient.id,
         checkin_id: checkin?.id,
         message_text: aiResponse.text,
         tier: score.tier,

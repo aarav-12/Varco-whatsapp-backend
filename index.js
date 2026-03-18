@@ -183,7 +183,7 @@ app.post('/tally/neuropathy', async (req, res) => {
     res.status(200).json({ success: true });
 
     // ── BACKGROUND PROCESSING ──
-    setImmediate(() => processCheckin(supabase, patientId, answers));
+    setImmediate(() => processCheckin(supabase, phone, answers));
 
   } catch (err) {
     console.error('Neuropathy route error:', err);

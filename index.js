@@ -4,7 +4,6 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
-
 const { processCheckin } = require('./services/checkinService');
 
 const app = express();
@@ -53,7 +52,9 @@ app.post('/whatsapp/webhook', async (req, res) => {
 
     if (!message) return res.sendStatus(200);
 
-    const phone = message.from; // 91XXXXXXXXXX
+    const { normalizePhone } = require('./utils/phone');
+
+const phone = normalizePhone(message.from); // 91XXXXXXXXXX
     const text = message.text?.body;
 
     console.log('[USER MESSAGE]', phone, text);
@@ -139,7 +140,10 @@ app.post('/tally/neuropathy', async (req, res) => {
     const fields = req.body.data.fields;
     const getValue = parseFields(fields);
 
-    const phone = getValue('Your phone number');
+    const { normalizePhone } = require('./utils/phone');
+
+const rawPhone = getValue('Your phone number');
+const phone = normalizePhone(rawPhone);
 
     const answers = {
       burning: parseInt(getValue('How much burning pain in your feet right now?')) || 0,
@@ -166,8 +170,7 @@ app.post('/tally/neuropathy', async (req, res) => {
     res.status(200).json({ success: true });
 
     // 🔥 IMPORTANT: pass phone (NOT patientId)
-    setImmediate(() => processCheckin(supabase, phone, answers));
-
+   await processCheckin(supabase, phone, answers);
   } catch (err) {
     console.error('Neuropathy error:', err);
     res.status(500).json({ error: err.message });
@@ -204,3 +207,5 @@ const PORT = Number(process.env.PORT) || 3001;
 app.listen(PORT, () => {
   console.log(`Varco backend running on port ${PORT}`);
 });
+
+// require('./workers/checkinWorker');

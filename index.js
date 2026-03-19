@@ -159,13 +159,21 @@ const phone = normalizePhone(rawPhone);
       movement: getValue('Did you do movement today?') === 'Yes',
       wound: getValue('Have you checked your feet today? Any cuts, blisters, redness or unusual warmth?') === 'Yes — I noticed something'
     };
-
+console.log('[PHONE]', phone);
+console.log('[ANSWERS]', answers);
     const patientId = await findOrCreatePatient(phone, 'neuropathy');
+    console.log('[PATIENT ID]', patientId);
 
-    await supabase.from('daily_checkins').insert({
-      patient_id: patientId,
-      ...answers
-    });
+    const { data, error } = await supabase.from('daily_checkins').insert({
+  patient_id: patientId,
+  ...answers
+});
+
+if (error) {
+  console.error('[CHECKIN INSERT ERROR]', error);
+} else {
+  console.log('[CHECKIN INSERT SUCCESS]', data);
+}
 
     res.status(200).json({ success: true });
 

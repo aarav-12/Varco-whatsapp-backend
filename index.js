@@ -1,10 +1,10 @@
-/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 const { processCheckin } = require('./services/checkinService');
+const { sendWhatsAppMessage } = require('./services/whatsappService');
 
 const app = express();
 app.use(express.json());
@@ -54,31 +54,35 @@ app.post('/whatsapp/webhook', async (req, res) => {
 
     const { normalizePhone } = require('./utils/phone');
 
-const phone = normalizePhone(message.from); // 91XXXXXXXXXX
-    const text = message.text?.body;
+    const phone = normalizePhone(message.from); // 91XXXXXXXXXX
+    const text = message.text?.body?.toLowerCase();
 
     console.log('[USER MESSAGE]', phone, text);
 
-    // ── TEMP: SIMPLE MOCK INPUT → later NLP
-    const answers = {
-      burning: 3,
-      tingling: 3,
-      numbness: 3,
-      walking: 2,
-      glucose: 120,
-      sleep: 5,
-      diafoot: false,
-      neurapan: false,
-      lumical_left: false,
-      lumical_right: false,
-      movement: false,
-      wound: false
-    };
+    if (!text) {
+      return res.sendStatus(200);
+    }
 
-    // ── RUN PIPELINE ──
-    processCheckin(supabase, phone, answers);
+    if (
+      text.includes('hi') ||
+      text.includes('start') ||
+      text.includes('check')
+    ) {
+      await sendWhatsAppMessage(
+        phone,
+        'Please fill your daily check-in form:\nhttps://tally.so/r/rjEPMM'
+      );
 
-    res.sendStatus(200);
+      console.log('[FORM LINK SENT]');
+      return res.sendStatus(200);
+    }
+
+    await sendWhatsAppMessage(
+      phone,
+      "Type 'start' to begin your daily check-in."
+    );
+
+    return res.sendStatus(200);
   } catch (err) {
     console.error('[WHATSAPP ERROR]', err);
     res.sendStatus(500);

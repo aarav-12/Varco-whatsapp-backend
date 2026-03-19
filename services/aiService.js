@@ -21,7 +21,7 @@ const generateMessage = async (score, answers) => {
         }
       }
     );
-
+console.log("[CLAUDE KEY CHECK]", process.env.CLAUDE_API_KEY?.slice(0, 10));
     return {
       text: response.data.content[0].text,
       isFallback: false,

@@ -1,8 +1,10 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 
 const { calculateVPNSS } = require('../utils/vpnss');
 const { generateMessage } = require('./aiService');
 const { sendWhatsAppMessage } = require('./whatsappService');
+const { triggerVapiCall } = require('./vapiService');
 
 const processCheckin = async (supabase, phone, answers) => {
   try {
@@ -65,7 +67,6 @@ const processCheckin = async (supabase, phone, answers) => {
 
     // ── VPNSS ──
     const score = calculateVPNSS(answers, last7 || [], missedDays);
-
     console.log('[VPNSS]', score);
 
     // ── GET TODAY CHECKIN ──
@@ -108,8 +109,30 @@ const processCheckin = async (supabase, phone, answers) => {
     // ── AI MESSAGE ──
     const aiResponse = await generateMessage(score, answers);
 
-    // ── WHATSAPP ──
-    await sendWhatsAppMessage(patient.phone, aiResponse.text);
+    // ── ROUTING LOGIC ──
+    const shouldCall =
+      score.hardOverride ||
+      ["severe", "critical"].includes(score.tier) ||
+      score.trajectory === "worsening";
+
+    console.log('[ROUTING]', shouldCall ? 'CALL + WHATSAPP' : 'WHATSAPP ONLY');
+
+    // ── ACTIONS ──
+    if (shouldCall) {
+      await triggerVapiCall({
+        phone: patient.phone.startsWith('+')
+          ? patient.phone
+          : `+${patient.phone}`,
+        message: aiResponse.text
+      });
+    }
+
+    // Always send WhatsApp (fallback + record)
+    try {
+      await sendWhatsAppMessage(patient.phone, aiResponse.text);
+    } catch (err) {
+      console.error('[WHATSAPP FAILED - EXPECTED IF NO TOKEN]');
+    }
 
     // ── STORE MESSAGE ──
     const { error: msgError } = await supabase

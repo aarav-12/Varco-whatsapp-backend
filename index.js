@@ -207,7 +207,7 @@ app.get('/test', async (req, res) => {
     wound: false
   };
 
-  await processCheckin(supabase, '+919999999999', fakeAnswers);
+  await processCheckin(supabase, '+917087692944', fakeAnswers);
 
   res.send('Test done');
 });

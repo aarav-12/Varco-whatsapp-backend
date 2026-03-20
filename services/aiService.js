@@ -4,7 +4,31 @@ const axios = require('axios');
 
 const generateMessage = async (score, answers) => {
   try {
-    const prompt = `...`; // your existing prompt
+    // 🔥 STEP 1: If no Claude key → use stub (today’s mode)
+    if (!process.env.CLAUDE_API_KEY) {
+      console.log("[AI MODE] Using STUB (no Claude API key)");
+
+      return {
+        text: `Test message:
+Tier: ${score.tier}
+Trajectory: ${score.trajectory}
+Stay consistent with your care routine today.`,
+        isFallback: true,
+        error: null
+      };
+    }
+
+    // 🔥 STEP 2: Real Claude call (future-ready)
+    const prompt = `
+You are a healthcare assistant.
+
+Patient condition:
+- Tier: ${score.tier}
+- Trajectory: ${score.trajectory}
+- Symptoms: ${JSON.stringify(answers)}
+
+Give a short, supportive, actionable message.
+`;
 
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
@@ -21,7 +45,9 @@ const generateMessage = async (score, answers) => {
         }
       }
     );
-console.log("[CLAUDE KEY CHECK]", process.env.CLAUDE_API_KEY?.slice(0, 10));
+
+    console.log("[CLAUDE SUCCESS]");
+
     return {
       text: response.data.content[0].text,
       isFallback: false,

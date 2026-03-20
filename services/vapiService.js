@@ -6,24 +6,26 @@ const VAPI_API_KEY = process.env.VAPI_API_KEY;
 async function triggerVapiCall({ phone, message }) {
   try {
     console.log("[VAPI] Triggering call to:", phone);
+    console.log("[VAPI KEY CHECK]", process.env.VAPI_API_KEY?.slice(0, 10));
+    console.log("[VAPI ASSISTANT ID CHECK]", process.env.VAPI_ASSISTANT_ID?.slice(0, 10));
 
     const response = await axios.post(
       "https://api.vapi.ai/call",
       {
+        // ✅ CORRECT payload
+        assistantId: process.env.VAPI_ASSISTANT_ID,
         customer: {
           number: phone
         },
-        assistant: {
-          // you will get this from VAPI dashboard
-          id: process.env.VAPI_ASSISTANT_ID
-        },
+        // optional but fine
         metadata: {
           message
         }
       },
       {
         headers: {
-          Authorization: `Bearer ${VAPI_API_KEY}`,
+          // ✅ CORRECT header (NO Bearer)
+          Authorization: process.env.VAPI_API_KEY,
           "Content-Type": "application/json"
         }
       }
@@ -34,7 +36,5 @@ async function triggerVapiCall({ phone, message }) {
     console.error("[VAPI ERROR]", err.response?.data || err.message);
   }
 }
-console.log("[VAPI KEY CHECK]", process.env.VAPI_API_KEY?.slice(0, 10));
-console.log("[VAPI ASSISTANT ID CHECK]", process.env.VAPI_ASSISTANT_ID?.slice(0, 10));
 
 module.exports = { triggerVapiCall };

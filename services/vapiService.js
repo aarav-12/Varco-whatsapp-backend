@@ -8,23 +8,30 @@ async function triggerVapiCall({ phone, message }) {
     console.log("[VAPI] Triggering call to:", phone);
     console.log("[VAPI KEY CHECK]", process.env.VAPI_API_KEY?.slice(0, 10));
     console.log("[VAPI ASSISTANT ID CHECK]", process.env.VAPI_ASSISTANT_ID?.slice(0, 10));
+    console.log("[PHONE NUMBER ID CHECK]", process.env.VAPI_PHONE_NUMBER_ID);
 
     const response = await axios.post(
       "https://api.vapi.ai/call",
       {
-        // ✅ CORRECT payload
+        // ✅ WHO is speaking
         assistantId: process.env.VAPI_ASSISTANT_ID,
+
+        // ✅ FROM which number (THIS WAS MISSING)
+        phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID,
+
+        // ✅ WHO to call
         customer: {
           number: phone
         },
-        // optional but fine
+
+        // optional context
         metadata: {
           message
         }
       },
       {
         headers: {
-          // ✅ CORRECT header (NO Bearer)
+          // ✅ correct auth format
           Authorization: process.env.VAPI_API_KEY,
           "Content-Type": "application/json"
         }

@@ -34,5 +34,7 @@ async function triggerVapiCall({ phone, message }) {
     console.error("[VAPI ERROR]", err.response?.data || err.message);
   }
 }
+console.log("[VAPI KEY CHECK]", process.env.VAPI_API_KEY?.slice(0, 10));
+console.log("[VAPI ASSISTANT ID CHECK]", process.env.VAPI_ASSISTANT_ID?.slice(0, 10));
 
 module.exports = { triggerVapiCall };

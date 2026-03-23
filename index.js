@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+
 require('dotenv').config();
 const { processCheckin } = require('./services/checkinService');
 const { sendWhatsAppMessage } = require('./services/whatsappService');
@@ -10,10 +10,7 @@ const app = express();
 app.use(express.json());
 
 // ─── ENV ───────────────────────────────────────────────
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const { supabase } = require('./supabaseClient');
 
 // ─── ROOT ──────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -221,3 +218,4 @@ app.listen(PORT, () => {
 });
 
 // require('./workers/checkinWorker');
+require('./services/cronService');

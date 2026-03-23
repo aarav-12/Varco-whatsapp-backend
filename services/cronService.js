@@ -10,10 +10,8 @@ function getTodayDate() {
   return new Date().toISOString().split('T')[0];
 }
 
-/* =========================
-   8 AM MORNING NUDGE
-========================= */
-cron.schedule('*/2 * * * *', async () => {
+// 8am routine
+cron.schedule('0 8 * * *', async () => {
   try {
     const today = getTodayDate();
 
@@ -54,10 +52,8 @@ cron.schedule('*/2 * * * *', async () => {
 });
 
 
-/* =========================
-   12 PM FOLLOW-UP
-========================= */
-cron.schedule('*/2 * * * *', async () => {
+//12pm followuop
+cron.schedule('0 12 * * *', async () => {
   try {
     const today = getTodayDate();
 
@@ -109,10 +105,8 @@ cron.schedule('*/2 * * * *', async () => {
 });
 
 
-/* =========================
-   7 PM FINAL REMINDER
-========================= */
-cron.schedule('*/2 * * * *', async () => {
+// 7pm final reminder
+cron.schedule('0 19 * * *', async () => {
   try {
     const today = getTodayDate();
 

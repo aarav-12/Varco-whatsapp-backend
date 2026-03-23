@@ -1,7 +1,8 @@
 /* eslint-disable no-undef */
 const cron = require('node-cron');
 const { supabase } = require('../supabaseClient');
-const { sendWhatsAppMessage } = require('./whatsappService'); // adjust path
+const { sendWhatsAppMessage } = require('./whatsappService');
+const { normalizePhone } = require('../utils/phone');
 
 console.log('🚀 Cron service loaded');
 
@@ -23,36 +24,46 @@ cron.schedule('*/2 * * * *', async () => {
       .select('*');
 
     if (patientError) {
-      console.error('Error fetching patients:', patientError);
+      console.error('❌ Error fetching patients:', patientError);
       return;
     }
 
-    console.log(`Total patients: ${patients.length}`);
+    console.log(`👥 Total patients: ${patients.length}`);
 
     for (const patient of patients) {
+      // Normalize phone
+      const phone = normalizePhone(patient.phone);
+
+      if (!phone) {
+        console.log(`⚠️ Skipping invalid phone for patient ${patient.id}`);
+        continue;
+      }
+
       // 2. Check if patient has check-in today
       const { data: checkin, error: checkinError } = await supabase
         .from('daily_checkins')
         .select('id')
         .eq('patient_id', patient.id)
         .eq('date', today)
-        .maybeSingle(); // better than .single()
+        .maybeSingle();
 
       if (checkinError) {
-        console.error(`Check-in error for ${patient.id}:`, checkinError);
+        console.error(`❌ Check-in error for ${patient.id}:`, checkinError);
         continue;
       }
 
       // 3. If NOT checked in → send nudge
       if (!checkin) {
-        console.log(`📩 Nudge → ${patient.phone}`);
+        console.log(`📩 Nudge → ${phone}`);
 
-        await sendWhatsAppMessage({
-          to: patient.phone,
-          message: 'Good morning! Please fill your daily check-in form.'
-        });
+        // ⚠️ TEMP DISABLE until token fixed
+        // await sendWhatsAppMessage({
+        //   to: phone,
+        //   message: 'Good morning! Please fill your daily check-in form.'
+        // });
+
       } else {
-        console.log(`✅ Already checked in: ${patient.phone}`);
+        console.log(`✅ Already checked in: ${phone}`);
       }
     }
 

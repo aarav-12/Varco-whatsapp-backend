@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 
 const express = require('express');
@@ -14,18 +15,18 @@ const {
 const app = express();
 app.use(express.json());
 
-// ─── ENV ───────────────────────────────────────────────
+// ─── ENV ─
 const { supabase } = require('./supabaseClient');
 
-// ─── ROOT ──────────────────────────────────────────────
+// ─── ROOT 
 app.get('/', (req, res) => {
   res.send('Varco backend is running!');
 });
 
 
-// ======================================================
+
 // 🔥 WHATSAPP WEBHOOK (NEW)
-// ======================================================
+
 
 // ── VERIFY WEBHOOK ──
 app.get('/whatsapp/webhook', (req, res) => {
@@ -92,9 +93,9 @@ app.post('/whatsapp/webhook', async (req, res) => {
 });
 
 
-// ======================================================
+
 // 🧩 TALLY ROUTES (UNCHANGED CORE)
-// ======================================================
+
 
 const parseFields = (fields) => {
   const getValue = (label) => {
@@ -243,7 +244,81 @@ app.post('/cron/run/:job', async (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+app.post('/patients', async (req, res) => {
+  try {
+    const { name, phone, condition } = req.body;
 
+    if (!phone || !condition) {
+      return res.status(400).json({ error: 'Phone and condition are required' });
+    }
+
+    const { normalizePhone } = require('./utils/phone');
+    const normalizedPhone = normalizePhone(phone);
+
+    // check if patient already exists
+    const { data: existing } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('phone', normalizedPhone)
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(200).json({
+        message: 'Patient already exists',
+        patient: existing
+      });
+    }
+
+    // insert new patient
+    const { data: patient, error } = await supabase
+      .from('patients')
+      .insert({
+        name: name || 'Unknown',
+        phone: normalizedPhone,
+        condition,
+        programme_day: 1
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[PATIENT INSERT ERROR]', error);
+      return res.status(500).json({ error: 'Failed to create patient' });
+    }
+
+    console.log('[PATIENT CREATED]', patient.id);
+
+    // select form link based on condition
+    let formLink = '';
+
+    if (condition === 'neuropathy') {
+      formLink = 'https://tally.so/r/rjEPMM'; // your existing link
+    } else if (condition === 'varicose') {
+      formLink = 'https://your-varicose-form-link'; // 🔥 replace this
+    }
+
+    // send welcome message
+    try {
+      await sendWhatsAppMessage(
+        normalizedPhone,
+        `Hi ${name || ''} 👋\nWelcome to your care program.\n\nPlease fill your daily check-in:\n${formLink}`
+      );
+
+      console.log('[WELCOME MESSAGE SENT]');
+    } catch (err) {
+      console.error('[WELCOME MESSAGE FAILED]');
+    }
+
+    res.status(200).json({
+      success: true,
+      patient
+    });
+
+  } catch (err) {
+    console.error('[ENROLMENT ERROR]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─── START SERVER ───────────────────────────────────────
 const PORT = Number(process.env.PORT) || 3001;

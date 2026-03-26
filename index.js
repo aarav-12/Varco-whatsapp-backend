@@ -5,6 +5,11 @@ const express = require('express');
 require('dotenv').config();
 const { processCheckin } = require('./services/checkinService');
 const { sendWhatsAppMessage } = require('./services/whatsappService');
+const {
+  runMorningNudge,
+  runNoonFollowup,
+  runFinalReminder
+} = require('./services/cronService');
 
 const app = express();
 app.use(express.json());
@@ -209,6 +214,36 @@ app.get('/test', async (req, res) => {
   res.send('Test done');
 });
 
+// ─── CRON DEBUG ROUTES ─────────────────────────────────
+app.post('/cron/run/:job', async (req, res) => {
+  const { job } = req.params;
+
+  try {
+    if (job === 'morning') {
+      await runMorningNudge();
+      return res.status(200).json({ success: true, job: 'morning' });
+    }
+
+    if (job === 'noon') {
+      await runNoonFollowup();
+      return res.status(200).json({ success: true, job: 'noon' });
+    }
+
+    if (job === 'final') {
+      await runFinalReminder();
+      return res.status(200).json({ success: true, job: 'final' });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: 'Unknown job. Use: morning, noon, final'
+    });
+  } catch (err) {
+    console.error('[CRON MANUAL RUN ERROR]', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 // ─── START SERVER ───────────────────────────────────────
 const PORT = Number(process.env.PORT) || 3001;
@@ -218,4 +253,3 @@ app.listen(PORT, () => {
 });
 
 // require('./workers/checkinWorker');
-require('./services/cronService');

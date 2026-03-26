@@ -1,6 +1,14 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
+// // Takes a patient’s answers
+//  Calculates a health score (VPNSS)
+//  Decides how serious things are
+//  Sends a WhatsApp message (always)
+//  Calls the patient (if serious)
+//  Saves everything in the database
 
+// Basically:
+// Input → Analyze → Decide → Act → Log
 const { calculateVPNSS } = require('../utils/vpnss');
 const { generateMessage } = require('./aiService');
 const { sendWhatsAppMessage } = require('./whatsappService');
@@ -118,21 +126,47 @@ const processCheckin = async (supabase, phone, answers) => {
     console.log('[ROUTING]', shouldCall ? 'CALL + WHATSAPP' : 'WHATSAPP ONLY');
 
     // ── ACTIONS ──
-    if (shouldCall) {
-      await triggerVapiCall({
-        phone: patient.phone.startsWith('+')
-          ? patient.phone
-          : `+${patient.phone}`,
-        message: aiResponse.text
-      });
-    }
+   if (shouldCall) {
+  let callStatus = 'sent';
+
+  try {
+    await triggerVapiCall({
+      phone: patient.phone.startsWith('+')
+        ? patient.phone
+        : `+${patient.phone}`,
+      message: aiResponse.text
+    });
+  } catch (err) {
+    console.error('[CALL FAILED]', err);
+    callStatus = 'failed';
+  }
+
+  await supabase.from('communication_logs').insert({
+    patient_id: patient.id,
+    type: 'call',
+    channel: 'call',
+    status: callStatus
+  });
+}
 
     // Always send WhatsApp (fallback + record)
-    try {
-      await sendWhatsAppMessage(patient.phone, aiResponse.text);
-    } catch (err) {
-      console.error('[WHATSAPP FAILED - EXPECTED IF NO TOKEN]');
-    }
+   
+    let messageStatus = 'sent';
+
+try {
+  await sendWhatsAppMessage(patient.phone, aiResponse.text);
+} catch (err) {
+  console.error('[WHATSAPP FAILED]');
+  messageStatus = 'failed';
+}
+
+// 🔥 ADD THIS BLOCK
+await supabase.from('communication_logs').insert({
+  patient_id: patient.id,
+  type: 'coaching_message',
+  channel: 'whatsapp',
+  status: messageStatus
+});
 
     // ── STORE MESSAGE ──
     const { error: msgError } = await supabase

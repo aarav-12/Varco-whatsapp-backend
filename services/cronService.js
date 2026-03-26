@@ -10,8 +10,7 @@ function getTodayDate() {
   return new Date().toISOString().split('T')[0];
 }
 
-// 8am routine
-cron.schedule('0 8 * * *', async () => {
+async function runMorningNudge() {
   try {
     const today = getTodayDate();
 
@@ -46,14 +45,15 @@ cron.schedule('0 8 * * *', async () => {
         status: 'sent'
       });
     }
+
+    console.log('✅ 8AM cron completed');
   } catch (err) {
     console.error('8AM error:', err);
   }
-});
+}
 
 
-//12pm followuop
-cron.schedule('0 12 * * *', async () => {
+async function runNoonFollowup() {
   try {
     const today = getTodayDate();
 
@@ -99,14 +99,15 @@ cron.schedule('0 12 * * *', async () => {
         status: 'sent'
       });
     }
+
+    console.log('✅ 12PM cron completed');
   } catch (err) {
     console.error('12PM error:', err);
   }
-});
+}
 
 
-// 7pm final reminder
-cron.schedule('0 19 * * *', async () => {
+async function runFinalReminder() {
   try {
     const today = getTodayDate();
 
@@ -141,7 +142,24 @@ cron.schedule('0 19 * * *', async () => {
         status: 'sent'
       });
     }
+
+    console.log('✅ 7PM cron completed');
   } catch (err) {
     console.error('7PM error:', err);
   }
-});
+}
+
+// 8am routine
+cron.schedule('0 8 * * *', runMorningNudge);
+
+// 12pm followup
+cron.schedule('0 12 * * *', runNoonFollowup);
+
+// 7pm final reminder
+cron.schedule('0 19 * * *', runFinalReminder);
+
+module.exports = {
+  runMorningNudge,
+  runNoonFollowup,
+  runFinalReminder
+};

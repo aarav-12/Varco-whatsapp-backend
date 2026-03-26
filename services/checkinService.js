@@ -167,7 +167,7 @@ await supabase.from('communication_logs').insert({
   channel: 'whatsapp',
   status: messageStatus
 });
-
+console.log('[COMM LOG INSERTED]');
     // ── STORE MESSAGE ──
     const { error: msgError } = await supabase
       .from('coaching_messages')

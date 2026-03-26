@@ -158,7 +158,7 @@ cron.schedule('0 12 * * *', runNoonFollowup);
 // 7pm final reminder
 cron.schedule('0 19 * * *', runFinalReminder);
 // SLA Monitor (every 30 min)
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('*/30 * * * *', async () => {
   console.log('🛡️ SLA MONITOR TRIGGERED');
   await runSLAMonitor(supabase);
 });

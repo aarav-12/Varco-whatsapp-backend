@@ -27,12 +27,15 @@ const sendWhatsAppMessage = async (to, message) => {
     );
 
     console.log("[WHATSAPP API SUCCESS]", response.data);
+    return response.data; // ✅ optional but clean
 
   } catch (error) {
     console.error(
       "[WHATSAPP API ERROR]",
       error.response?.data || error.message
     );
+
+    throw error; // 🔥 CRITICAL FIX
   }
 };
 

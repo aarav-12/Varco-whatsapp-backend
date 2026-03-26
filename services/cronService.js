@@ -3,7 +3,7 @@ const cron = require('node-cron');
 const { supabase } = require('../supabaseClient');
 const { sendWhatsAppMessage } = require('./whatsappService');
 const { normalizePhone } = require('../utils/phone');
-
+const { runSLAMonitor } = require('./slaMonitor');
 console.log('🚀 Cron service loaded');
 
 function getTodayDate() {
@@ -33,10 +33,10 @@ async function runMorningNudge() {
 
       console.log(`📩 8AM → ${phone}`);
 
-      // await sendWhatsAppMessage({
-      //   to: phone,
-      //   message: 'Good morning! Please fill your daily check-in form.'
-      // });
+      await sendWhatsAppMessage({
+        to: phone,
+        message: 'Good morning! Please fill your daily check-in form.'
+      });
 
       await supabase.from('communication_logs').insert({
         patient_id: patient.id,
@@ -157,7 +157,11 @@ cron.schedule('0 12 * * *', runNoonFollowup);
 
 // 7pm final reminder
 cron.schedule('0 19 * * *', runFinalReminder);
-
+// SLA Monitor (every 30 min)
+cron.schedule('*/2 * * * *', async () => {
+  console.log('🛡️ SLA MONITOR TRIGGERED');
+  await runSLAMonitor(supabase);
+});
 module.exports = {
   runMorningNudge,
   runNoonFollowup,

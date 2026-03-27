@@ -148,6 +148,50 @@ async function runFinalReminder() {
     console.error('7PM error:', err);
   }
 }
+async function runEndOfDayUpdate() {
+  try {
+    console.log('🌙 11:55PM → Updating programme_day');
+
+    const { data: patients, error } = await supabase
+      .from('patients')
+      .select('id, programme_day');
+
+    if (error) {
+      console.error('[EOD ERROR]', error);
+      return;
+    }
+
+    const updates = patients.map(p => ({
+      id: p.id,
+      programme_day: (p.programme_day || 0) + 1
+    }));
+
+    const { error: updateError } = await supabase
+      .from('patients')
+      .upsert(updates);
+
+    if (updateError) {
+      console.error('[EOD ERROR]', updateError);
+      return;
+    }
+
+    console.log('✅ programme_day updated for all patients');
+  } catch (err) {
+    console.error('[EOD ERROR]', err);
+  }
+}
+
+//     console.log('✅ programme_day updated for all patients');
+//   } catch (err) {
+//     console.error('[EOD ERROR]', err);
+//   }
+// }
+
+//     console.log('✅ programme_day updated for all patients');
+//   } catch (err) {
+//     console.error('[EOD ERROR]', err);
+//   }
+// }
 
 // 8am routine
 cron.schedule('0 8 * * *', runMorningNudge);
@@ -162,8 +206,11 @@ cron.schedule('*/30 * * * *', async () => {
   console.log('🛡️ SLA MONITOR TRIGGERED');
   await runSLAMonitor(supabase);
 });
+cron.schedule('55 23 * * *', runEndOfDayUpdate);
 module.exports = {
   runMorningNudge,
   runNoonFollowup,
-  runFinalReminder
+  runFinalReminder,
+  runEndOfDayUpdate
+
 };

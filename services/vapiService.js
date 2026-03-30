@@ -25,6 +25,12 @@ async function triggerVapiCall({ phone, message }) {
         },
 
         // optional context
+          
+
+
+
+
+
         metadata: {
           message
         }

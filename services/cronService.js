@@ -6,13 +6,15 @@ const { normalizePhone } = require('../utils/phone');
 const { runSLAMonitor } = require('./slaMonitor');
 console.log('🚀 Cron service loaded');
 
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0];
+function getTodayDateIST() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  return ist.toISOString().split('T')[0];
 }
 
 async function runMorningNudge() {
   try {
-    const today = getTodayDate();
+    const today = getTodayDateIST();
 
     const { data: patients } = await supabase
       .from('patients')
@@ -194,19 +196,25 @@ async function runEndOfDayUpdate() {
 // }
 
 // 8am routine
-cron.schedule('0 8 * * *', runMorningNudge);
+cron.schedule('0 8 * * *', runMorningNudge, {
+  timezone: "Asia/Kolkata"
+});
 
 // 12pm followup
-cron.schedule('0 12 * * *', runNoonFollowup);
+cron.schedule('0 12 * * *', runNoonFollowup, {
+  timezone: "Asia/Kolkata"
+});
 
 // 7pm final reminder
-cron.schedule('0 19 * * *', runFinalReminder);
+cron.schedule('0 19 * * *', runFinalReminder, {
+  timezone: "Asia/Kolkata"
+});
 // SLA Monitor (every 30 min)
 cron.schedule('*/30 * * * *', async () => {
   console.log('🛡️ SLA MONITOR TRIGGERED');
   await runSLAMonitor(supabase);
 });
-cron.schedule('55 23 * * *', runEndOfDayUpdate);
+cron.schedule('55 23 * * * *', runEndOfDayUpdate);
 module.exports = {
   runMorningNudge,
   runNoonFollowup,

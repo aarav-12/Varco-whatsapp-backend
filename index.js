@@ -319,7 +319,20 @@ app.post('/patients', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.get('/test/morning', async (req, res) => {
+  await runMorningNudge();
+  res.send('Morning nudge triggered');
+});
 
+app.get('/test/noon', async (req, res) => {
+  await runNoonFollowup();
+  res.send('Noon followup triggered');
+});
+
+app.get('/test/night', async (req, res) => {
+  await runFinalReminder();
+  res.send('Night reminder triggered');
+});
 // ─── START SERVER ───────────────────────────────────────
 const PORT = Number(process.env.PORT) || 3001;
 

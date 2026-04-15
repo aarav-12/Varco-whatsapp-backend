@@ -4,14 +4,21 @@ const { supabase } = require('../supabaseClient');
 const { sendWhatsAppMessage } = require('./whatsappService');
 const { normalizePhone } = require('../utils/phone');
 const { runSLAMonitor } = require('./slaMonitor');
+
 console.log('🚀 Cron service loaded');
 
+// ✅ Single source of truth for date
 function getTodayDateIST() {
   const now = new Date();
-  const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const ist = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  );
   return ist.toISOString().split('T')[0];
 }
 
+// ─────────────────────────────
+// 🌅 8AM — Morning Nudge
+// ─────────────────────────────
 async function runMorningNudge() {
   try {
     const today = getTodayDateIST();
@@ -35,10 +42,11 @@ async function runMorningNudge() {
 
       console.log(`📩 8AM → ${phone}`);
 
-      await sendWhatsAppMessage({
-        to: phone,
-        message: 'Good morning! Please fill your daily check-in form.'
-      });
+      // ✅ FIXED CALL SIGNATURE
+      await sendWhatsAppMessage(
+        phone,
+        'Good morning! Please fill your daily check-in form.'
+      );
 
       await supabase.from('communication_logs').insert({
         patient_id: patient.id,
@@ -54,10 +62,12 @@ async function runMorningNudge() {
   }
 }
 
-
+// ─────────────────────────────
+// 🔁 12PM — Follow-up
+// ─────────────────────────────
 async function runNoonFollowup() {
   try {
-    const today = getTodayDate();
+    const today = getTodayDateIST(); // ✅ FIXED
 
     const { data: logs } = await supabase
       .from('communication_logs')
@@ -66,7 +76,7 @@ async function runNoonFollowup() {
       .gte('created_at', `${today}T00:00:00`)
       .lte('created_at', `${today}T23:59:59`);
 
-    const patientIds = [...new Set(logs.map(l => l.patient_id))];
+    const patientIds = [...new Set((logs || []).map(l => l.patient_id))];
 
     for (const patientId of patientIds) {
       const { data: checkin } = await supabase
@@ -89,10 +99,11 @@ async function runNoonFollowup() {
 
       console.log(`🔁 12PM → ${phone}`);
 
-      // await sendWhatsAppMessage({
-      //   to: phone,
-      //   message: 'Reminder: please complete your check-in today.'
-      // });
+      // 👉 Uncomment when ready
+      await sendWhatsAppMessage(
+        phone,
+        'Reminder: please complete your check-in today.'
+      );
 
       await supabase.from('communication_logs').insert({
         patient_id: patientId,
@@ -108,10 +119,12 @@ async function runNoonFollowup() {
   }
 }
 
-
+// ─────────────────────────────
+// 🔴 7PM — Final Reminder
+// ─────────────────────────────
 async function runFinalReminder() {
   try {
-    const today = getTodayDate();
+    const today = getTodayDateIST(); // ✅ FIXED
 
     const { data: patients } = await supabase
       .from('patients')
@@ -132,10 +145,11 @@ async function runFinalReminder() {
 
       console.log(`🔴 7PM → ${phone}`);
 
-      // await sendWhatsAppMessage({
-      //   to: phone,
-      //   message: 'Final reminder: please complete your check-in today.'
-      // });
+      // 👉 Uncomment when ready
+      await sendWhatsAppMessage(
+        phone,
+        'Final reminder: please complete your check-in today.'
+      );
 
       await supabase.from('communication_logs').insert({
         patient_id: patient.id,
@@ -150,6 +164,10 @@ async function runFinalReminder() {
     console.error('7PM error:', err);
   }
 }
+
+// ─────────────────────────────
+// 🌙 11:55PM — Day Increment
+// ─────────────────────────────
 async function runEndOfDayUpdate() {
   try {
     console.log('🌙 11:55PM → Updating programme_day');
@@ -183,42 +201,37 @@ async function runEndOfDayUpdate() {
   }
 }
 
-//     console.log('✅ programme_day updated for all patients');
-//   } catch (err) {
-//     console.error('[EOD ERROR]', err);
-//   }
-// }
+// ─────────────────────────────
+// ⏱️ CRON SCHEDULES
+// ─────────────────────────────
 
-//     console.log('✅ programme_day updated for all patients');
-//   } catch (err) {
-//     console.error('[EOD ERROR]', err);
-//   }
-// }
-
-// 8am routine
+// 8AM
 cron.schedule('0 8 * * *', runMorningNudge, {
   timezone: "Asia/Kolkata"
 });
 
-// 12pm followup
+// 12PM
 cron.schedule('0 12 * * *', runNoonFollowup, {
   timezone: "Asia/Kolkata"
 });
 
-// 7pm final reminder
+// 7PM
 cron.schedule('0 19 * * *', runFinalReminder, {
   timezone: "Asia/Kolkata"
 });
-// SLA Monitor (every 30 min)
+
+// SLA monitor (every 30 min)
 cron.schedule('*/30 * * * *', async () => {
   console.log('🛡️ SLA MONITOR TRIGGERED');
   await runSLAMonitor(supabase);
 });
-cron.schedule('55 23 * * * *', runEndOfDayUpdate);
+
+// 11:55PM
+cron.schedule('55 23 * * *', runEndOfDayUpdate);
+
 module.exports = {
   runMorningNudge,
   runNoonFollowup,
   runFinalReminder,
   runEndOfDayUpdate
-
 };

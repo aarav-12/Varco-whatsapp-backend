@@ -9,6 +9,12 @@ const { triggerVapiCall } = require('./vapiService');
 const processCheckin = async (supabase, phone, answers) => {
   try {
     console.log('[PROCESS START]', phone);
+    console.log('[RAW ANSWERS]', answers);
+
+    // ── EXTRACT USER INFO (TALLY SAFE) ──
+    const name = answers.name || answers.full_name || answers.patient_name || null;
+    const age = answers.age || null;
+    const sex = answers.sex || answers.gender || null;
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -47,6 +53,31 @@ const processCheckin = async (supabase, phone, answers) => {
 
       patient = newPatient;
       console.log('[PATIENT CREATED]', patient.id);
+    }
+
+    // ── UPDATE PATIENT PROFILE ──
+
+    // Name
+    if (name && (!patient.name || patient.name === 'Unknown')) {
+      await supabase
+        .from('patients')
+        .update({ name })
+        .eq('id', patient.id);
+
+      console.log('[PATIENT NAME UPDATED]');
+    }
+
+    // Age + Sex
+    if (age && !patient.age) {
+      await supabase
+        .from('patients')
+        .update({
+          age: isNaN(parseInt(age)) ? null : parseInt(age),
+          sex: sex || null
+        })
+        .eq('id', patient.id);
+
+      console.log('[PATIENT DEMOGRAPHICS UPDATED]');
     }
 
     // ── GET LAST 7 DAYS ──

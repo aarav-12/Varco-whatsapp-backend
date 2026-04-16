@@ -1,14 +1,6 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
-// // Takes a patient’s answers
-//  Calculates a health score (VPNSS)
-//  Decides how serious things are
-//  Sends a WhatsApp message (always)
-//  Calls the patient (if serious)
-//  Saves everything in the database
 
-// Basically:
-// Input → Analyze → Decide → Act → Log
 const { calculateVPNSS } = require('../utils/vpnss');
 const { generateMessage } = require('./aiService');
 const { sendWhatsAppMessage } = require('./whatsappService');
@@ -19,6 +11,12 @@ const processCheckin = async (supabase, phone, answers) => {
     console.log('[PROCESS START]', phone);
 
     const today = new Date().toISOString().split('T')[0];
+
+    // ✅ NORMALIZE INPUT (important)
+    answers.swelling_side = answers.swelling_side?.toLowerCase();
+    if (!['left', 'right'].includes(answers.swelling_side)) {
+      answers.swelling_side = null;
+    }
 
     // ── FIND OR CREATE PATIENT ──
     let patient;
@@ -71,7 +69,11 @@ const processCheckin = async (supabase, phone, answers) => {
           .split('T')[0]
       );
 
-    const missedDays = Math.max(0, 14 - (recent?.length || 0));
+    // ✅ FIXED LOGIC (CRITICAL)
+    let missedDays = 0;
+    if (recent && recent.length > 0) {
+      missedDays = Math.max(0, 14 - recent.length);
+    }
 
     // ── VPNSS ──
     const score = calculateVPNSS(answers, last7 || [], missedDays);
@@ -121,53 +123,53 @@ const processCheckin = async (supabase, phone, answers) => {
     const shouldCall =
       score.hardOverride ||
       ["severe", "critical"].includes(score.tier) ||
-      score.trajectory === "worsening";
+      (score.tier === "moderate" && score.trajectory === "worsening");
 
     console.log('[ROUTING]', shouldCall ? 'CALL + WHATSAPP' : 'WHATSAPP ONLY');
 
     // ── ACTIONS ──
-   if (shouldCall) {
-  let callStatus = 'sent';
+    if (shouldCall) {
+      let callStatus = 'sent';
 
-  try {
-    await triggerVapiCall({
-      phone: patient.phone.startsWith('+')
-        ? patient.phone
-        : `+${patient.phone}`,
-      message: aiResponse.text
-    });
-  } catch (err) {
-    console.error('[CALL FAILED]', err);
-    callStatus = 'failed';
-  }
+      try {
+        await triggerVapiCall({
+          phone: patient.phone.startsWith('+')
+            ? patient.phone
+            : `+${patient.phone}`,
+          message: aiResponse.text
+        });
+      } catch (err) {
+        console.error('[CALL FAILED]', err);
+        callStatus = 'failed';
+      }
 
-  await supabase.from('communication_logs').insert({
-    patient_id: patient.id,
-    type: 'call',
-    channel: 'call',
-    status: callStatus
-  });
-}
+      await supabase.from('communication_logs').insert({
+        patient_id: patient.id,
+        type: 'call',
+        channel: 'call',
+        status: callStatus
+      });
+    }
 
-    // Always send WhatsApp (fallback + record)
-   
+    // ── WHATSAPP ──
     let messageStatus = 'sent';
 
-try {
-  await sendWhatsAppMessage(patient.phone, aiResponse.text);
-} catch (err) {
-  console.error('[WHATSAPP FAILED]');
-  messageStatus = 'failed';
-}
+    try {
+      await sendWhatsAppMessage(patient.phone, aiResponse.text);
+    } catch (err) {
+      console.error('[WHATSAPP FAILED]');
+      messageStatus = 'failed';
+    }
 
-// 🔥 ADD THIS BLOCK
-await supabase.from('communication_logs').insert({
-  patient_id: patient.id,
-  type: 'coaching_message',
-  channel: 'whatsapp',
-  status: messageStatus
-});
-console.log('[COMM LOG INSERTED]');
+    await supabase.from('communication_logs').insert({
+      patient_id: patient.id,
+      type: 'coaching_message',
+      channel: 'whatsapp',
+      status: messageStatus
+    });
+
+    console.log('[COMM LOG INSERTED]');
+
     // ── STORE MESSAGE ──
     const { error: msgError } = await supabase
       .from('coaching_messages')

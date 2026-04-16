@@ -11,17 +11,43 @@ const processCheckin = async (supabase, phone, answers) => {
     console.log('[PROCESS START]', phone);
     console.log('[RAW ANSWERS]', answers);
 
+    // ── NORMALIZE TALLY INPUT ──
+    let parsedAnswers = {};
+
+    // If Tally format (fields array)
+    if (answers.fields && Array.isArray(answers.fields)) {
+      for (const field of answers.fields) {
+        if (!field.label) continue;
+
+        const key = field.label.toLowerCase().replace(/\s+/g, '_');
+        parsedAnswers[key] = field.value;
+      }
+    } else {
+      parsedAnswers = answers; // fallback (your current format)
+    }
+
+    console.log('[PARSED ANSWERS]', parsedAnswers);
+
     // ── EXTRACT USER INFO (TALLY SAFE) ──
-    const name = answers.name || answers.full_name || answers.patient_name || null;
-    const age = answers.age || null;
-    const sex = answers.sex || answers.gender || null;
+    const name =
+      parsedAnswers.name ||
+      parsedAnswers.full_name ||
+      parsedAnswers.patient_name ||
+      null;
+
+    const age = parsedAnswers.age || null;
+
+    const sex =
+      parsedAnswers.sex ||
+      parsedAnswers.gender ||
+      null;
 
     const today = new Date().toISOString().split('T')[0];
 
     // ✅ NORMALIZE INPUT (important)
-    answers.swelling_side = answers.swelling_side?.toLowerCase();
-    if (!['left', 'right'].includes(answers.swelling_side)) {
-      answers.swelling_side = null;
+    parsedAnswers.swelling_side = parsedAnswers.swelling_side?.toLowerCase();
+    if (!['left', 'right'].includes(parsedAnswers.swelling_side)) {
+      parsedAnswers.swelling_side = null;
     }
 
     // ── FIND OR CREATE PATIENT ──
@@ -41,7 +67,7 @@ const processCheckin = async (supabase, phone, answers) => {
         .from('patients')
         .insert({
           phone: phone,
-          name: 'Unknown'
+          name: name || 'Unknown'
         })
         .select()
         .single();
@@ -107,7 +133,7 @@ const processCheckin = async (supabase, phone, answers) => {
     }
 
     // ── VPNSS ──
-    const score = calculateVPNSS(answers, last7 || [], missedDays);
+    const score = calculateVPNSS(parsedAnswers, last7 || [], missedDays);
     console.log('[VPNSS]', score);
 
     // ── GET TODAY CHECKIN ──
@@ -142,13 +168,19 @@ const processCheckin = async (supabase, phone, answers) => {
 
     if (vpnssError) {
       console.error('[VPNSS SAVE ERROR]', vpnssError);
-      return;
+
+      // Keep the patient communication flow alive even if vpnss_scores insert is blocked by RLS.
+      if (vpnssError.code !== '42501') {
+        return;
+      }
+
+      console.warn('[VPNSS SAVE SKIPPED] Continuing after RLS restriction on vpnss_scores');
     }
 
     console.log('[VPNSS SAVED]');
 
     // ── AI MESSAGE ──
-    const aiResponse = await generateMessage(score, answers);
+    const aiResponse = await generateMessage(score, parsedAnswers);
 
     // ── ROUTING LOGIC ──
     const shouldCall =

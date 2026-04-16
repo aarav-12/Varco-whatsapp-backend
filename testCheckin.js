@@ -1,13 +1,8 @@
 /* eslint-disable no-undef */
 
 require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
 const { processCheckin } = require('./services/checkinService');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const { supabase } = require('./supabaseClient');
 
 async function runTest(phone, answers) {
   await processCheckin(supabase, phone, answers);

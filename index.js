@@ -51,14 +51,22 @@ app.post('/whatsapp/webhook', async (req, res) => {
 
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+
+    const value = changes?.value;
+
+    // ignore status updates
+    if (value?.statuses) {
+      return res.sendStatus(200);
+    }
+
+    const message = value?.messages?.[0];
 
     if (!message) return res.sendStatus(200);
 
     const { normalizePhone } = require('./utils/phone');
 
-    const phone = normalizePhone(message.from); // 91XXXXXXXXXX
-    const text = message.text?.body?.toLowerCase();
+    const phone = normalizePhone(message.from);
+    const text = message.text?.body?.toLowerCase()?.trim();
 
     console.log('[USER MESSAGE]', phone, text);
 
@@ -66,11 +74,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (
-      text.includes('hi') ||
-      text.includes('start') ||
-      text.includes('check')
-    ) {
+    if (["hi", "hello", "start"].includes(text)) {
       await sendWhatsAppMessage(
         phone,
         'Please fill your daily check-in form:\nhttps://tally.so/r/rjEPMM'

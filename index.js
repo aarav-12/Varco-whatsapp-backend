@@ -54,19 +54,35 @@ app.post('/whatsapp/webhook', async (req, res) => {
 
     const value = changes?.value;
 
-    // ignore status updates
-    if (value?.statuses) {
+    if (!value) return res.sendStatus(200);
+
+    // 🚫 Ignore delivery/read receipts
+    if (value.statuses) {
+      console.log('[STATUS IGNORED]');
       return res.sendStatus(200);
     }
 
-    const message = value?.messages?.[0];
-
+    const message = value.messages?.[0];
     if (!message) return res.sendStatus(200);
 
     const { normalizePhone } = require('./utils/phone');
 
     const phone = normalizePhone(message.from);
-    const text = message.text?.body?.toLowerCase()?.trim();
+
+    // ✅ Handle different message types
+    let text = '';
+
+    if (message.type === 'text') {
+      text = message.text?.body;
+    } else if (message.type === 'button') {
+      text = message.button?.text;
+    } else if (message.type === 'interactive') {
+      text =
+        message.interactive?.button_reply?.title ||
+        message.interactive?.list_reply?.title;
+    }
+
+    text = text?.toLowerCase()?.trim();
 
     console.log('[USER MESSAGE]', phone, text);
 
@@ -74,6 +90,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // 🚀 MAIN FLOW
     if (["hi", "hello", "start"].includes(text)) {
       await sendWhatsAppMessage(
         phone,
@@ -84,15 +101,25 @@ app.post('/whatsapp/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // 🧠 OPTIONAL: smart commands
+    if (text === 'help') {
+      await sendWhatsAppMessage(
+        phone,
+        "Send 'Hi' to start your daily check-in."
+      );
+      return res.sendStatus(200);
+    }
+
+    // 🔁 fallback
     await sendWhatsAppMessage(
       phone,
-      "Type 'start' to begin your daily check-in."
+      "Send 'Hi' to begin your check-in."
     );
 
     return res.sendStatus(200);
   } catch (err) {
     console.error('[WHATSAPP ERROR]', err);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
